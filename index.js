@@ -23,6 +23,7 @@ export default class PinchZoomView extends Component {
     minScale: PropTypes.number,
     maxScale: PropTypes.number,
     enable: PropTypes.bool,
+    feed: PropTypes.bool,
     onZoom: PropTypes.func,
     ImageUri: PropTypes.string,
   }
@@ -32,6 +33,7 @@ export default class PinchZoomView extends Component {
     minScale: 0.5,
     maxScale: 10,
     enable: false,
+    feed: false,
     ImageUri: '',
   }
 
@@ -46,6 +48,7 @@ export default class PinchZoomView extends Component {
       lastY: 0,
       lastMovePinch: false,
       enable: false,
+      feedOneTouch: false,
     }
     this.distant = 150
   }
@@ -107,7 +110,8 @@ export default class PinchZoomView extends Component {
   }
 
   _handlePanResponderEnd = (e, gestureState) => {
-    if (this.state.scale < 1) {
+    this.state.feedOneTouch = false
+    if (this.props.feed) {
       Animated.parallel([
         Animated.timing(this.offsetX, {
           toValue: 0,
@@ -125,8 +129,6 @@ export default class PinchZoomView extends Component {
           this.state.offsetY = 0
         }
       })
-    }
-    if (this.state.scale < 1) {
       Animated.timing(this.scale, {
         toValue: 1,
         duration: 250,
@@ -144,34 +146,73 @@ export default class PinchZoomView extends Component {
         }
       })
     }
-    else if (this.state.scale > 3) {
-      Animated.timing(this.scale, {
-        toValue: 3,
-        duration: 250,
-        useNativeDriver: true,
-      }).start((finished) => {
-        if (finished) {
-          this.setState({
-            scale: 3,
-            lastMovePinch: true,
-            lastX: this.state.offsetX,
-            lastY: this.state.offsetY,
-            lastScale: 3,
-          })
-        }
-      })
-    }
     else {
-      this.setState({
-        scale: this.state.scale,
-        lastMovePinch: true,
-        lastX: this.state.offsetX,
-        lastY: this.state.offsetY,
-        lastScale: this.state.scale,
-      })
-      this.scale.setValue(this.state.scale)
+      if (this.state.scale < 1) {
+        Animated.parallel([
+          Animated.timing(this.offsetX, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(this.offsetY, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]).start((finished) => {
+          if (finished) {
+            this.state.offsetX = 0
+            this.state.offsetY = 0
+          }
+        })
+      }
+      if (this.state.scale < 1) {
+        Animated.timing(this.scale, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }).start((finished) => {
+          if (finished) {
+            this.setState({
+              scale: 1,
+              lastMovePinch: true,
+              lastX: this.state.offsetX,
+              lastY: this.state.offsetY,
+              lastScale: 1,
+            })
+            this.props.onZoom(true)
+          }
+        })
+      }
+      else if (this.state.scale > 3) {
+        Animated.timing(this.scale, {
+          toValue: 3,
+          duration: 250,
+          useNativeDriver: true,
+        }).start((finished) => {
+          if (finished) {
+            this.setState({
+              scale: 3,
+              lastMovePinch: true,
+              lastX: this.state.offsetX,
+              lastY: this.state.offsetY,
+              lastScale: 3,
+            })
+          }
+        })
+      }
+      else {
+        this.setState({
+          scale: this.state.scale,
+          lastMovePinch: true,
+          lastX: this.state.offsetX,
+          lastY: this.state.offsetY,
+          lastScale: this.state.scale,
+        })
+        this.scale.setValue(this.state.scale)
+      }
+      this.scaleSet = false
     }
-    this.scaleSet = false
   }
 
   @observable offsetX = new Animated.Value(0)
@@ -179,7 +220,47 @@ export default class PinchZoomView extends Component {
   @observable scaleSet = false
 
   _handlePanResponderMove = (e, gestureState) => {
-    if (gestureState.numberActiveTouches === 2) {
+    if (gestureState.numberActiveTouches === 1) {
+      this.scaleSet = false
+      if (this.props.feed) {
+        this.state.feedOneTouch = true
+      }
+      if (this.state.scale < 1) {
+        this.scaleSet = true
+      }
+    }
+
+    if (this.props.feed) {
+      if (gestureState.numberActiveTouches === 2 && !this.state.feedOneTouch) {
+        const dx = Math.abs(
+          e.nativeEvent.touches[0].pageX - e.nativeEvent.touches[1].pageX,
+        )
+        const dy = Math.abs(
+          e.nativeEvent.touches[0].pageY - e.nativeEvent.touches[1].pageY,
+        )
+        const distant = Math.sqrt(dx * dx + dy * dy)
+        const scale = (distant / this.distant) * this.state.lastScale
+        // check scale min to max hello
+        if (scale < this.props.maxScale && scale > 0.99) {
+          this.setState({ scale, lastMovePinch: true })
+          this.scale.setValue(scale)
+        }
+      }
+      if (this.state.lastMovePinch) {
+        gestureState.dx = 0
+        gestureState.dy = 0
+      }
+      const offsetX = this.state.lastX + gestureState.dx / this.state.scale
+      const offsetY = this.state.lastY + gestureState.dy / this.state.scale
+      this.offsetX.setValue(offsetX)
+      this.setState({ offsetX, lastMovePinch: false })
+      this.offsetY.setValue(offsetY)
+      this.setState({ offsetY, lastMovePinch: false })
+    }
+    else if (
+      gestureState.numberActiveTouches === 2
+      && !this.state.feedOneTouch
+    ) {
       this.scaleSet = true
       const dx = Math.abs(
         e.nativeEvent.touches[0].pageX - e.nativeEvent.touches[1].pageX,
@@ -195,7 +276,6 @@ export default class PinchZoomView extends Component {
         this.scale.setValue(scale)
       }
     }
-
     // translate
     else if (gestureState.numberActiveTouches === 1 && !this.scaleSet) {
       if (!this.props.enable) return
