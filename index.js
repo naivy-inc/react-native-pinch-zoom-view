@@ -351,6 +351,42 @@ export default class PinchZoomView extends Component {
     }
   }
 
+  setDefault = () => {
+    Animated.parallel([
+      Animated.timing(this.offsetX, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(this.offsetY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start((finished) => {
+      if (finished) {
+        this.state.offsetX = 0
+        this.state.offsetY = 0
+      }
+    })
+    Animated.timing(this.scale, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start((finished) => {
+      if (finished) {
+        this.setState({
+          scale: 1,
+          lastMovePinch: true,
+          lastX: this.state.offsetX,
+          lastY: this.state.offsetY,
+          lastScale: 1,
+        })
+        this.props.onZoom(true)
+      }
+    })
+  }
+
   render() {
     return (
       <Animated.View
