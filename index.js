@@ -355,12 +355,12 @@ export default class PinchZoomView extends Component {
     Animated.parallel([
       Animated.timing(this.offsetX, {
         toValue: 0,
-        duration: 250,
+        duration: 1,
         useNativeDriver: true,
       }),
       Animated.timing(this.offsetY, {
         toValue: 0,
-        duration: 250,
+        duration: 1,
         useNativeDriver: true,
       }),
     ]).start((finished) => {
@@ -371,7 +371,7 @@ export default class PinchZoomView extends Component {
     })
     Animated.timing(this.scale, {
       toValue: 1,
-      duration: 250,
+      duration: 1,
       useNativeDriver: true,
     }).start((finished) => {
       if (finished) {
